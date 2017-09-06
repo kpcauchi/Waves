@@ -1,30 +1,25 @@
 package com.wavesplatform.http
 
-import java.util.concurrent.locks.ReentrantReadWriteLock
-
 import com.wavesplatform.BlockGen
-import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.{SnapshotStateReader}
-import monix.eval.Coeval
+import com.wavesplatform.state2.diffs.newHistory
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.JsObject
 import scorex.api.http.BlockNotExists
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
-import scorex.settings.TestFunctionalitySettings
 
 class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHelper with PropertyChecks with MockFactory with BlockGen with HistoryTest {
   private val state = mock[SnapshotStateReader]
 
-  private val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Stub,
-    TestFunctionalitySettings.EmptyFeaturesSettings).get
-  appendGenesisBlock(history)
-  for (i <- 1 to 10) appendTestBlock(history)
+  private val history = newHistory()
+//  appendGenesisBlock(history)
+//  for (i <- 1 to 10) appendTestBlock(history)
 
-  private val route = NxtConsensusApiRoute(restAPISettings, Coeval.now(state), history, FunctionalitySettings.TESTNET).route
+  private val route = NxtConsensusApiRoute(restAPISettings, state, history, FunctionalitySettings.TESTNET).route
 
   routePath("/generationsignature") - {
     "for last block" in {

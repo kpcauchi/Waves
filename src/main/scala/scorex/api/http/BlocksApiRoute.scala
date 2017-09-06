@@ -173,8 +173,8 @@ case class BlocksApiRoute(settings: RestAPISettings,
 
   def last(includeTransactions: Boolean): StandardRoute = {
     complete(Future {
-      history.read { _ =>
-        val height = history.height()
+      {
+        val height = history.height
 
         (if (includeTransactions) {
           history.blockAt(height).get.json()
@@ -219,7 +219,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
   def checkpoint: Route = (path("checkpoint") & post) {
     json[Checkpoint] { checkpoint =>
       checkpointProc(checkpoint).runAsync(rollbackExecutor).map {
-        _.map(score => allChannels.broadcast(LocalScoreChanged(score.getOrElse(history.score()))))
+        _.map(score => allChannels.broadcast(LocalScoreChanged(score.getOrElse(history.score))))
       }.map(_.fold(ApiError.fromValidationError,
         _ => Json.obj("" -> "")): ToResponseMarshallable)
     }

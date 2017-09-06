@@ -42,7 +42,12 @@ object Dependencies {
   lazy val akka = Seq("actor", "slf4j").map(akkaModule)
 
   lazy val db = Seq(
-    "com.h2database" % "h2-mvstore" % "1.4.196"
+    "com.h2database" % "h2-mvstore" % "1.4.196",
+    "org.flywaydb" % "flyway-core" % "4.2.0",
+    "com.zaxxer" % "HikariCP" % "2.7.0",
+    "org.scalikejdbc" %% "scalikejdbc" % "3.0.2",
+    "org.postgresql" % "postgresql" % "42.1.4",
+    "org.xerial" % "sqlite-jdbc" % "3.20.0"
   )
 
   lazy val logging = Seq(

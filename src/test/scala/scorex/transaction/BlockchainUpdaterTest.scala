@@ -5,9 +5,9 @@ import java.util.concurrent.{Semaphore, TimeUnit}
 
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.history._
+import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.produce
 import org.scalatest.words.ShouldVerb
-import com.wavesplatform.state2._
 import org.scalatest.{FunSuite, Matchers}
 import scorex.block.Block
 
@@ -28,13 +28,10 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
     featuresSettings = DefaultWavesSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = true)
   )
 
-  private def storageFactory() = {
-    val (storage, _) = StorageFactory(WavesSettings).get
-    storage()
-  }
+  private def storageFactory() = StorageFactory(WavesSettings, ???, ???)
 
   ignore ("concurrent access to lastBlock doesn't throw any exception") {
-    val (h, fp, _, _, bu, _) = storageFactory()
+    val (h, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -60,162 +57,162 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
 
   test("features approved and accepted as height grows") {
 
-    val (h, fp, _, _, bu, _) = storageFactory()
+    val (h, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
-    fp.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
-    fp.featureStatus(2, 1) shouldBe BlockchainFeatureStatus.Undefined
-    fp.featureStatus(3, 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.featureStatus(2, 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.featureStatus(3, 1) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 until ApprovalPeriod).foreach { _ =>
       bu.processBlock(getNextTestBlockWithVotes(h, Set(1)))
     }
 
-    h.height() shouldBe ApprovalPeriod
-    fp.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
-    fp.featureStatus(2, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
-    fp.featureStatus(3, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
+    h.height shouldBe ApprovalPeriod
+    h.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
+    h.featureStatus(2, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
+    h.featureStatus(3, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod).foreach { _ =>
       bu.processBlock(getNextTestBlockWithVotes(h, Set(2)))
     }
 
-    h.height() shouldBe 2 * ApprovalPeriod
-    fp.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
-    fp.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
-    fp.featureStatus(3, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
+    h.height shouldBe 2 * ApprovalPeriod
+    h.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
+    h.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
+    h.featureStatus(3, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod).foreach { _ =>
       bu.processBlock(getNextTestBlockWithVotes(h, Set()))
     }
 
-    h.height() shouldBe 3 * ApprovalPeriod
-    fp.featureStatus(1, 3 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
-    fp.featureStatus(2, 3 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
-    fp.featureStatus(3, 3 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
+    h.height shouldBe 3 * ApprovalPeriod
+    h.featureStatus(1, 3 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
+    h.featureStatus(2, 3 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
+    h.featureStatus(3, 3 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
   }
 
   test("features rollback with block rollback") {
-    val (h, fp, _, _, bu, _) = storageFactory()
+    val (h, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
-    fp.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
-    fp.featureStatus(2, 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.featureStatus(2, 1) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 until ApprovalPeriod).foreach { _ =>
       bu.processBlock(getNextTestBlockWithVotes(h, Set(1))).explicitGet()
     }
 
-    h.height() shouldBe ApprovalPeriod
-    fp.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
-    fp.featureStatus(2, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
+    h.height shouldBe ApprovalPeriod
+    h.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
+    h.featureStatus(2, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
 
     bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
 
-    h.height() shouldBe ApprovalPeriod - 1
-    fp.featureStatus(1, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
-    fp.featureStatus(2, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.height shouldBe ApprovalPeriod - 1
+    h.featureStatus(1, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.featureStatus(2, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod + 1).foreach { _ =>
       bu.processBlock(getNextTestBlockWithVotes(h, Set(2))).explicitGet()
     }
 
-    h.height() shouldBe 2 * ApprovalPeriod
-    fp.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
-    fp.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
+    h.height shouldBe 2 * ApprovalPeriod
+    h.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
+    h.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
 
     bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
 
-    h.height() shouldBe 2 * ApprovalPeriod - 1
-    fp.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Approved
-    fp.featureStatus(2, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.height shouldBe 2 * ApprovalPeriod - 1
+    h.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Approved
+    h.featureStatus(2, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
 
     bu.processBlock(getNextTestBlockWithVotes(h, Set.empty)).explicitGet()
 
-    h.height() shouldBe 2 * ApprovalPeriod
-    fp.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
-    fp.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
+    h.height shouldBe 2 * ApprovalPeriod
+    h.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
+    h.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
 
     bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
 
-    h.height() shouldBe 2 * ApprovalPeriod - 1
-    fp.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Approved
-    fp.featureStatus(2, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.height shouldBe 2 * ApprovalPeriod - 1
+    h.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Approved
+    h.featureStatus(2, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
 
     bu.removeAfter(h.lastBlockIds(ApprovalPeriod + 1).last).explicitGet()
 
-    h.height() shouldBe ApprovalPeriod - 1
-    fp.featureStatus(1, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
-    fp.featureStatus(2, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.height shouldBe ApprovalPeriod - 1
+    h.featureStatus(1, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.featureStatus(2, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
   }
 
   test("feature activation height is not overrided with further periods") {
-    val (h, fp, _, _, bu, _) = storageFactory()
+    val (h, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
-    fp.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
 
-    fp.featureActivationHeight(1) shouldBe None
+    h.featureActivationHeight(1) shouldBe None
 
     (1 until ApprovalPeriod).foreach { _ =>
       bu.processBlock(getNextTestBlockWithVotes(h, Set(1))).explicitGet()
     }
 
-    fp.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
+    h.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
 
     (1 to ApprovalPeriod).foreach { _ =>
       bu.processBlock(getNextTestBlockWithVotes(h, Set(1))).explicitGet()
     }
 
-    fp.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
+    h.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
   }
 
   test("feature activated only by 90% of blocks") {
-    val (h, fp, _, _, bu, _) = storageFactory()
+    val (h, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
-    fp.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 until ApprovalPeriod).foreach { i =>
       bu.processBlock(getNextTestBlockWithVotes(h, if (i % 2 == 0) Set(1) else Set())).explicitGet()
     }
-    fp.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
+    h.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod).foreach { i =>
       bu.processBlock(getNextTestBlockWithVotes(h, if (i % 10 == 0) Set() else Set(1))).explicitGet()
     }
-    fp.featureStatus(1, ApprovalPeriod * 2) shouldBe BlockchainFeatureStatus.Approved
+    h.featureStatus(1, ApprovalPeriod * 2) shouldBe BlockchainFeatureStatus.Approved
 
     (1 to ApprovalPeriod).foreach { i =>
       bu.processBlock(getNextTestBlock(h)).explicitGet()
     }
-    fp.featureStatus(1, ApprovalPeriod * 3) shouldBe BlockchainFeatureStatus.Activated
+    h.featureStatus(1, ApprovalPeriod * 3) shouldBe BlockchainFeatureStatus.Activated
   }
 
   test("features votes resets when voting window changes") {
-    val (h, fp, _, _, bu, _) = storageFactory()
+    val (h, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
-    fp.featureVotesCountWithinActivationWindow(h.height()) shouldBe Map.empty
+    h.featureVotesCountWithinActivationWindow(h.height) shouldBe Map.empty
 
-    fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Undefined
+    h.featureStatus(1, h.height) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 until ApprovalPeriod).foreach { i =>
       bu.processBlock(getNextTestBlockWithVotes(h, Set(1)))
-      fp.featureVotesCountWithinActivationWindow(h.height()) shouldBe Map(1.toShort -> i)
+      h.featureVotesCountWithinActivationWindow(h.height) shouldBe Map(1.toShort -> i)
     }
 
-    fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Approved
+    h.featureStatus(1, h.height) shouldBe BlockchainFeatureStatus.Approved
 
     bu.processBlock(getNextTestBlockWithVotes(h, Set(1)))
-    fp.featureVotesCountWithinActivationWindow(h.height()) shouldBe Map(1.toShort -> 1)
+    h.featureVotesCountWithinActivationWindow(h.height) shouldBe Map(1.toShort -> 1)
 
-    fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Approved
+    h.featureStatus(1, h.height) shouldBe BlockchainFeatureStatus.Approved
   }
 
   test("block processing should fail if unimplemented feature was activated on blockchaing when autoShutdownOnUnsupportedFeature = yes and exit with code 38") {
@@ -237,7 +234,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
     })
 
 
-    val (h, fp, _, _, bu, _) = storageFactory()
+    val (h, _, bu, _) = storageFactory()
     bu.processBlock(genesisBlock)
 
     (1 to ApprovalPeriod * 2).foreach { i =>
@@ -252,15 +249,15 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("sunny day test when known feature activated") {
-    val (h, fp, _, _, bu, _) = storageFactory()
+    val (h, _, bu, _) = storageFactory()
     bu.processBlock(genesisBlock)
 
-    (1 until ApprovalPeriod * 2 - 1).foreach { i =>
+    (1 until ApprovalPeriod * 2 - 1).foreach { _ =>
       bu.processBlock(getNextTestBlockWithVotes(h, Set(1))).explicitGet()
     }
 
-    fp.featureStatus(1, h.height()) should be(BlockchainFeatureStatus.Approved)
+    h.featureStatus(1, h.height) should be(BlockchainFeatureStatus.Approved)
     bu.processBlock(getNextTestBlockWithVotes(h, Set(1))).explicitGet()
-    fp.featureStatus(1, h.height()) should be(BlockchainFeatureStatus.Activated)
+    h.featureStatus(1, h.height) should be(BlockchainFeatureStatus.Activated)
   }
 }

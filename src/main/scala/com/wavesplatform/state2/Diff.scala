@@ -2,10 +2,20 @@ package com.wavesplatform.state2
 
 import cats.Monoid
 import cats.implicits._
-import scorex.account.{Address, Alias}
+import scorex.account.{Address, Alias, PublicKeyAccount}
 import scorex.transaction.Transaction
 
-case class Snapshot(prevHeight: Int, balance: Long, effectiveBalance: Long)
+case class Snapshot(wavesBalance: Option[WavesBalance] = None, assetBalances: Map[ByteStr, Long] = Map.empty)
+
+object Snapshot {
+  implicit val m: Monoid[Snapshot] = new Monoid[Snapshot] {
+    override def empty = Snapshot()
+    override def combine(x: Snapshot, y: Snapshot) = Snapshot(
+      y.wavesBalance orElse x.wavesBalance,
+      y.assetBalances ++ x.assetBalances
+    )
+  }
+}
 
 case class LeaseInfo(leaseIn: Long, leaseOut: Long)
 
@@ -28,7 +38,9 @@ object OrderFillInfo {
   }
 }
 
-case class AssetInfo(isReissuable: Boolean, volume: Long)
+case class AssetDescription(issuer: PublicKeyAccount, name: Array[Byte], decimals: Int, reissuable: Boolean)
+
+case class AssetInfo(isReissuable: Boolean, volume: BigInt)
 
 object AssetInfo {
   implicit val assetInfoMonoid = new Monoid[AssetInfo] {

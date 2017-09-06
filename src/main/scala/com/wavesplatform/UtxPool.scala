@@ -8,7 +8,8 @@ import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
-import com.wavesplatform.state2.{ByteStr, Diff, Portfolio, StateReader}
+import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
 import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
 import monix.eval.Task
@@ -43,7 +44,7 @@ trait UtxPool {
 }
 
 class UtxPoolImpl(time: Time,
-                  stateReader: StateReader,
+                  stateReader: SnapshotStateReader,
                   history: History,
                   feeCalculator: FeeCalculator,
                   fs: FunctionalitySettings,
@@ -55,7 +56,7 @@ class UtxPoolImpl(time: Time,
   private val pessimisticPortfolios = new PessimisticPortfolios
 
   private val removeInvalid = Task {
-    val state = stateReader()
+    val state = stateReader
     val transactionsToRemove = transactions.values.asScala.filter(t => state.containsTransaction(t.id()))
     removeAll(transactionsToRemove)
   }.delayExecution(utxSettings.cleanupInterval)
@@ -85,12 +86,12 @@ class UtxPoolImpl(time: Time,
   override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = {
     putRequestStats.increment()
     measureSuccessful(processingTimeStats, {
-      val s = stateReader()
+      val s = stateReader
       for {
         _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
         _ <- checkNotBlacklisted(tx)
         _ <- feeCalculator.enoughFee(tx)
-        diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, tx)
+        diff <- TransactionDiffer(fs, history.lastBlockTimestamp, time.correctedTime(), s.height)(s, tx)
       } yield {
         utxPoolSizeStats.increment()
         pessimisticPortfolios.add(tx.id(), diff)
@@ -133,12 +134,12 @@ class UtxPoolImpl(time: Time,
     removeExpired(time.correctedTime())
   }
 
-  override def portfolio(addr: Address): Portfolio = {
-    val base = stateReader().accountPortfolio(addr)
+  override def portfolio(addr: Address): Portfolio = ??? /*{
+    val base = stateReader.accountPortfolio(addr)
     val foundInUtx = pessimisticPortfolios.getAggregated(addr)
 
     Monoid.combine(base, foundInUtx)
-  }
+  }*/
 
   override def all: Seq[Transaction] = {
     transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
@@ -151,8 +152,8 @@ class UtxPoolImpl(time: Time,
   override def packUnconfirmed(max: Int, sortInBlock: Boolean): Seq[Transaction] = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
-    val s = stateReader()
-    val differ = TransactionDiffer(fs, history.lastBlockTimestamp(), currentTs, s.height) _
+    val s = stateReader
+    val differ = TransactionDiffer(fs, history.lastBlockTimestamp, currentTs, s.height) _
     val (invalidTxs, reversedValidTxs, _) = transactions
       .values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)

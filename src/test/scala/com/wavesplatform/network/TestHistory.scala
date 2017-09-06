@@ -1,9 +1,6 @@
 package com.wavesplatform.network
 
-import java.util.concurrent.locks.ReentrantReadWriteLock
-
 import com.wavesplatform.state2.ByteStr
-import com.wavesplatform.utils.HeightInfo
 import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.transaction.History.BlockchainScore
@@ -15,7 +12,18 @@ class TestHistory extends NgHistory {
     lastBlockIds = s +: lastBlockIds
   }
 
+  override def lastBlockId() = ???
+
+  override def debugInfo = ???
+
+  override protected val activationWindowSize: Int = ???
+
+  override def approvedFeatures() = ???
+
+  override def featureVotesCountWithinActivationWindow(height: Int) = ???
+
   private var lastBlockIds = Seq.empty[BlockId] // fresh head
+
   override def lastBlockIds(howMany: Int): Seq[ByteStr] = lastBlockIds.take(howMany)
 
   override def microBlock(id: ByteStr): Option[MicroBlock] = ???
@@ -26,21 +34,19 @@ class TestHistory extends NgHistory {
 
   override def heightOf(blockId: ByteStr): Option[Int] = ???
 
-  override def lastBlockTimestamp(): Option[Long] = ???
-
   override def blockHeaderAndSizeAt(height: Int): Option[(BlockHeader, Int)] = ???
 
-  override def lastBlockId(): Option[ByteStr] = ???
-
-  override def blockAt(height: Int): Option[Block] = ???
-
-  override def height(): Int = ???
+  override def height: Int = ???
 
   override def scoreOf(id: ByteStr): Option[BlockchainScore] = ???
 
-  override def synchronizationToken: ReentrantReadWriteLock = ???
+  override def score = ???
 
-  override def close(): Unit = ???
+  override def lastBlock = ???
 
-  override def debugInfo: HeightInfo = ???
+  override def blockBytes(blockId: BlockId) = ???
+
+  override def blockIdsAfter(parentSignature: BlockId, howMany: Int) = ???
+
+  override def parent(ofBlock: Block, back: Int) = ???
 }

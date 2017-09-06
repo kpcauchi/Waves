@@ -7,10 +7,11 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.utils._
+import com.wavesplatform.database.createDataSource
 import org.slf4j.bridge.SLF4JBridgeHandler
 import scorex.account.AddressScheme
 import scorex.block.Block
-import scorex.utils.ScorexLogging
+import scorex.utils.{NTP, ScorexLogging}
 
 import scala.util.{Failure, Success, Try}
 
@@ -21,7 +22,8 @@ object Importer extends ScorexLogging {
     SLF4JBridgeHandler.install()
 
     val configFilename = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
-    val settings = WavesSettings.fromConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))
+    val config = loadConfig(ConfigFactory.parseFile(new File(configFilename)))
+    val settings = WavesSettings.fromConfig(config)
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
@@ -33,13 +35,17 @@ object Importer extends ScorexLogging {
           case Success(inputStream) =>
             deleteFile(settings.blockchainSettings.blockchainFile)
             deleteFile(settings.blockchainSettings.stateFile)
-            val (storage, _) = StorageFactory(settings).get
-            val (history, _, stateWriter, _, blockchainUpdater, _) = storage()
+            val (history, _, blockchainUpdater, _) = StorageFactory(settings, createDataSource(config.getConfig("waves.database")), NTP)
             checkGenesis(history, settings, blockchainUpdater)
             val bis = new BufferedInputStream(inputStream)
             var quit = false
             val lenBytes = new Array[Byte](Ints.BYTES)
             val start = System.currentTimeMillis()
+            var counter = 0
+            var blocksToSkip = history.height - 1
+
+            println(s"Skipping $blocksToSkip blocks")
+
             while (!quit) {
               val red = bis.read(lenBytes)
               if (red == Ints.BYTES) {
@@ -47,17 +53,27 @@ object Importer extends ScorexLogging {
                 val buffer = new Array[Byte](len)
                 val s2 = bis.read(buffer)
                 if (s2 == len) {
-                  val block = Block.parseBytes(buffer).get
-                  blockchainUpdater.processBlock(block)
+                  if (blocksToSkip > 0) {
+                    blocksToSkip -= 1
+                  } else {
+                    val block = Block.parseBytes(buffer).get
+                    if (history.lastBlock.exists(_.uniqueId == block.reference)) {
+                      blockchainUpdater.processBlock(block) match {
+                        case Left(ve) =>
+                          log.error(s"Error appending block: $ve")
+                          quit = true
+                        case _ =>
+                          counter = counter + 1
+                      }
+                    }
+                  }
                 } else quit = true
               } else quit = true
             }
             bis.close()
             inputStream.close()
-            stateWriter.close()
-            history.close()
             val duration = System.currentTimeMillis() - start
-            log.info(s"Imported in ${humanReadableDuration(duration)}")
+            log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
           case Failure(ex) => log.error(s"Failed to open file '$filename")
         }
       case Failure(ex) => log.error(s"Failed to get input filename from second parameter: $ex")

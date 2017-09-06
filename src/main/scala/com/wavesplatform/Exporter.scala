@@ -2,11 +2,9 @@ package com.wavesplatform
 
 import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.utils._
 import org.slf4j.bridge.SLF4JBridgeHandler
@@ -31,10 +29,10 @@ object Exporter extends ScorexLogging {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
-    val tryHistory = HistoryWriterImpl(settings.blockchainSettings.blockchainFile, new ReentrantReadWriteLock(true), settings.blockchainSettings.functionalitySettings, settings.featuresSettings)
+    val tryHistory: Try[History] = ???
     tryHistory match {
       case Success(history) =>
-        val blockchainHeight = history.height()
+        val blockchainHeight = history.height
         val height = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
         log.info(s"Blockchain height is $blockchainHeight exporting to $height")
         val outputFilename = s"$outputFilenamePrefix-$height"
